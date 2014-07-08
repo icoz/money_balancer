@@ -67,6 +67,56 @@ class MoneyBalancer(object):
         del self.debit
         return buddies_debts
 
+    def get_buddies_debts2(self):
+        avg = self.get_avg()
+        credit = list()
+        debit = list()
+        for b in self.buddies:
+            diff = self.buddies[b] - avg
+            if diff > 0:  # если кто-то должен этому чуваку
+                debit.append((diff, b))
+            elif diff < 0:  # если это чувак кому-то должен
+                credit.append((diff, b))
+            else:  # этот чувак чист - никому не должен, но никто и ему не должен
+                pass
+        # им должны - сортировка по убыванию
+        debit.sort(key=lambda x: x[0], reverse=True)
+        # они должны - сортировка по возрастанию (т.к. числа отрицательные)
+        credit.sort(key=lambda x: x[0])
+
+        print('Дебит - ' + debit.__str__())
+        print('Кредит - ' + credit.__str__())
+        print('Скидываемся по {0}'.format(avg))
+
+        # возвращаем долги
+        while len(debit) > 0:
+            dv, du = debit.pop(0)
+            print('\nСобираем {0} денег для {1}'.format(dv, du))
+            # собираем денег со всех должников
+            while True:
+                cv, cu = credit.pop(0)
+                # смотрим сколько может нам вернуть должник
+                delta = dv + cv
+                print('{0} должен всего {1} денег'.format(cu, cv))
+                if delta > 0:  # чувак отдал все деньги, но дебет еще есть
+                    # cu отдает du cv денег и отдыхает
+                    print('{0} отдает {1} {2} денег'.format(cu, du, abs(cv)))
+                    # оставшийся дебет
+                    dv = delta
+                    print('Остается в дебете {0}'.format(dv))
+                    pass
+                elif delta < 0:  # чувак покрыл дебет, но еще остался должен
+                    # cu отдает du dv денег и попадает опять в список должников
+                    credit.append((delta, cu))
+                    print('{0} отдает {1} {2} денег и будет должен {3}'.format(cu, du, dv, abs(delta)))
+                    break
+                else:  # дебет==кредит - они рассчитались друг с другом
+                    # cu отдает du cv денег и они оба отдыхают
+                    print('{0} отдает {1} {2} денег и все счастливы'.format(cu, du, abs(cv)))
+                    break
+
+        return None
+
     def clear(self):
         self.buddies = dict()
 
@@ -121,3 +171,28 @@ class TestMoneyBalancer(TestCase):
             'user5': {'user2': -7.0, 'user3': -12.0}
         }
         self.assertDictEqual(ret, val)
+
+    def test_get_buddies_debts2(self):
+        self.money.clear()
+        buddies = {
+            'user1': 0,
+            'user2': 100,
+            'user3': 43,
+            'user4': 33,
+            'user5': 12,
+            'user6': 155,
+            'user7': 9,
+            'user8': 77,
+            'user9': 47,
+        }
+        self.money.add_buddies(buddies)
+        self.money.get_buddies_debts2()
+        #ret = self.money.get_buddies_debts2()
+        #val = {
+        #    'user1': {'user2': -31.0},
+        #    'user2': {'user1': 31.0, 'user4': 31.0, 'user5': 7.0},
+        #    'user3': {'user5': 12.0},
+        #    'user4': {'user2': -31.0},
+        #    'user5': {'user2': -7.0, 'user3': -12.0}
+        #}
+        #self.assertDictEqual(ret, val)
