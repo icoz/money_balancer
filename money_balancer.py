@@ -112,11 +112,11 @@ class MoneyBalancer(object):
                     print('{0} должен всего {1} денег'.format(cu, cv))
                     if delta > 0:  # чувак отдал все деньги, но дебет еще есть
                         # cu отдает du cv денег и отдыхает
-                        print('{0} отдает {1} {2} денег'.format(cu, du, abs(cv)))
+                        print('{0} отдает {1} {2} денег'.format(cu, du, cv))
                         # кому - кто
-                        buddies_debts[du][cu] = cv
+                        buddies_debts[du][cu] = -cv
                         # кто - кому
-                        buddies_debts[cu][du] = -cv
+                        buddies_debts[cu][du] = cv
                         # оставшийся дебет
                         dv = delta
                         print('Остается в дебете {0}'.format(dv))
@@ -124,7 +124,7 @@ class MoneyBalancer(object):
                     elif delta < 0:  # чувак покрыл дебет, но еще остался должен
                         # cu отдает du dv денег и попадает опять в список должников
                         credit.append((delta, cu))
-                        print('{0} отдает {1} {2} денег и будет должен {3}'.format(cu, du, dv, abs(delta)))
+                        print('{0} отдает {1} {2} денег и будет должен еще кому-нибудь {3}'.format(cu, du, dv, delta))
                         # кому - кто
                         buddies_debts[du][cu] = dv
                         # кто - кому
@@ -132,7 +132,7 @@ class MoneyBalancer(object):
                         break
                     else:  # дебет==кредит - они рассчитались друг с другом
                         # cu отдает du cv денег и они оба отдыхают
-                        print('{0} отдает {1} {2} денег и все счастливы'.format(cu, du, abs(cv)))
+                        print('{0} отдает {1} {2} денег и все счастливы'.format(cu, du, cv))
                         # кому - кто
                         buddies_debts[du][cu] = dv
                         # кто - кому
@@ -201,19 +201,11 @@ class TestMoneyBalancer(TestCase):
 
     def test_get_buddies_debts2(self):
         self.money.clear()
-        buddies = {
-            'user1': 0,
-            'user2': 100,
-            'user3': 43,
-            'user4': 33,
-            'user5': 12,
-            'user6': 155,
-            'user7': 9,
-            'user8': 77,
-            'user9': 46,
-        }
+        buddies = {'user1': 34.76, 'user4': 745.36, 'user2': 286.32, 'user0': 723.32, 'user5': 775.38,
+                   'user3': 643.0, 'user6': 399.61, 'user7': 284.18}
         self.money.add_buddies(buddies)
-        self.money.get_buddies_debts2()
+        res = self.money.get_buddies_debts()
+        print(res)
 
     def test_get_buddies_debts3(self):
         """Генерируем случайные списки пользователей и денег."""
