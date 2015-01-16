@@ -1,35 +1,111 @@
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 from copy import deepcopy
 from unittest import TestCase
 from random import randint, random
+import operator
 
 __author__ = 'icoz'
+
+""" Расчет кто по сколько скидывается.
+
+        Задача: группа людей собирается на пати. У них есть коллективные расходы:
+                они покупают еду, бухло, прочее. Все люди тратят деньги (или только часть людей).
+                Необходимо определить кто по сколько должен скидываться.
+
+
+        Вариант 0
+        Общак.
+        Все участники должны скидываются поровну, но в реальности каждый потратил разную сумму.
+        Тот, кто должен, кладет деньги в общак.
+        Тот, кому должны, берет деньги из общака.
+
+        Вариант 1
+        Персональный.
+        Все участники должныскидываются поровну, но в реальности каждый потратил разную сумму
+        В результате расчета имеем список, кто кому должен сколько денег ЛИЧНО.
+
+        Вариант 2
+        Общак. Исключения.
+        Некоторые участники не употребляют определенные продукты (например алкоголь), т.е. они не скидываются
+        на продукты, которые им не нужны.
+        Каждый участник скидывается по разному, в зависимости от своих исключений.
+
+        Пример:
+            реальные затраты
+            У1 - 100
+            У2 - 150
+            У3 - 50
+            У4 - 0
+
+            исключения
+            У1 - 10 (У1 не пьет)
+            У3 - 20 (У3 не ест)
+
+        Вариант 3
+        Персональный. Исключения.
+"""
 
 
 class MoneyBalancer(object):
     def __init__(self):
+        # список участников и потраченых денег
         self.buddies = dict()
+        # список исключений (участники и деньги)
+        self.exclude = dict()
+
+        self.credit = list()
+        self.debit = list()
 
     def add_buddy(self, name, money):
+        """Добавление участника и суммы, которую он реально потратил."""
         self.buddies[name] = money
 
     def add_buddies(self, buddies):
+        """Добавление списка участников и реально потраченных ими сумм."""
         if not isinstance(buddies, dict):
             raise ValueError('buddies must be dict')
         for name in buddies:
             self.buddies[name] = buddies[name]
 
+    def add_exclusions(self, ex):
+        """Добавление списка исключений - участники и суммы."""
+        if not isinstance(ex, dict):
+            raise ValueError('exclusions must be dict')
+        for name in ex:
+            self.exclude[name] = ex[name]
+
     def get_avg(self):
-        sum = 0.0
+        """Расчет среднего значения по всем участникам."""
+        return round(self.get_total() / len(self.buddies), 2)
+
+    def get_total(self):
+        """Полная сумма по всем участникам."""
+        s = 0.0
         for buddy in self.buddies:
-            sum += self.buddies[buddy]
-        return round(sum / len(self.buddies), 2)
+            s += self.buddies[buddy]
+        return round(s, 2)
+
+    def get_total_exclude(self):
+        """Полная сумма исключений."""
+        s = 0.0
+        for ex in self.exclude:
+            s += self.exclude[ex]
+        return round(s, 2)
 
     def get_buddies(self):
+        """Получение списка участников."""
         return deepcopy(self.buddies)
 
+    def clear(self):
+        """Очистка списка участников."""
+        self.buddies = dict()
+
+    #  Методики расчета #
+
     def get_buddies_debts(self):
+        """Расчет Варианта 1 по методу icoz'a """
         avg = self.get_avg()
         self.credit = list()
         self.debit = list()
@@ -70,10 +146,26 @@ class MoneyBalancer(object):
         del self.debit
         return buddies_debts
 
-    def get_buddies_debts2(self):
+    def get_zero_variant2(self):
+        """"Расчет Варианта 0 по методу ilya-il'a """
+        # участники с положительной разницей берут из общака
+        # участники с отрицательной разницей кладут в общак
         avg = self.get_avg()
+
+        buddies_debts = list()
+        # сортируем по именам
+        for b in sorted(self.buddies.items(), key=operator.itemgetter(0)):
+            buddies_debts.append((b[0], b[1] - avg))
+
+        return buddies_debts
+
+    def get_first_variant2(self):
+        """Расчет Варианта 1 по методу ilya-il'a """
+        avg = self.get_avg()
+
         credit = list()
         debit = list()
+
         for b in self.buddies:
             diff = round(self.buddies[b] - avg, 2)
             if diff > 0:  # если кто-то должен этому чуваку
@@ -82,23 +174,26 @@ class MoneyBalancer(object):
                 credit.append((diff, b))
             else:  # этот чувак чист - никому не должен, но никто и ему не должен
                 pass
+
         # им должны - сортировка по убыванию
-        debit.sort(key=lambda x: x[0], reverse=True)
+        debit.sort(key=lambda x: (x[0], x[1]), reverse=True)
         # они должны - сортировка по возрастанию (т.к. числа отрицательные)
-        credit.sort(key=lambda x: x[0])
+        credit.sort(key=lambda x: (x[0], x[1]))
 
         print('Дебит - ' + debit.__str__())
         print('Кредит - ' + credit.__str__())
         print('Скидываемся по {0}'.format(avg))
 
-        # итоговый список
-        buddies_debts = dict()
+        # разделим кто-кому и кому-кто
+        debit_debts = dict()
+        credit_debts = dict()
+
         # возвращаем долги
         while len(debit) > 0:
             dv, du = debit.pop(0)
 
-            if buddies_debts.get(du) is None:
-                buddies_debts[du] = dict()
+            if debit_debts.get(du) is None:
+                debit_debts[du] = dict()
 
             print('\nСобираем {0} денег для {1}'.format(dv, du))
             # собираем денег со всех должников
@@ -106,8 +201,8 @@ class MoneyBalancer(object):
                 if len(credit) > 0:
                     cv, cu = credit.pop(0)
 
-                    if buddies_debts.get(cu) is None:
-                        buddies_debts[cu] = dict()
+                    if credit_debts.get(cu) is None:
+                        credit_debts[cu] = dict()
 
                     # смотрим сколько может нам вернуть должник
                     delta = round(dv + cv, 2)
@@ -116,9 +211,9 @@ class MoneyBalancer(object):
                         # cu отдает du cv денег и отдыхает
                         print('{0} отдает {1} {2} денег'.format(cu, du, cv))
                         # кому - кто
-                        buddies_debts[du][cu] = -cv
+                        debit_debts[du][cu] = -cv
                         # кто - кому
-                        buddies_debts[cu][du] = cv
+                        credit_debts[cu][du] = cv
                         # оставшийся дебет
                         dv = delta
                         print('Остается в дебете {0}'.format(dv))
@@ -128,26 +223,45 @@ class MoneyBalancer(object):
                         credit.append((delta, cu))
                         print('{0} отдает {1} {2} денег и будет должен еще кому-нибудь {3}'.format(cu, du, dv, delta))
                         # кому - кто
-                        buddies_debts[du][cu] = dv
+                        debit_debts[du][cu] = dv
                         # кто - кому
-                        buddies_debts[cu][du] = -dv
+                        credit_debts[cu][du] = -dv
                         break
                     else:  # дебет==кредит - они рассчитались друг с другом
                         # cu отдает du cv денег и они оба отдыхают
                         print('{0} отдает {1} {2} денег и все счастливы'.format(cu, du, cv))
                         # кому - кто
-                        buddies_debts[du][cu] = dv
+                        debit_debts[du][cu] = dv
                         # кто - кому
-                        buddies_debts[cu][du] = cv
+                        credit_debts[cu][du] = cv
                         break
                 else:
                     print('Из-за ошибок округления в дебите осталось немного денег - {0}'.format(dv))
                     break
 
-        return buddies_debts
+        return {'d': debit_debts,
+                'c': credit_debts}
 
-    def clear(self):
-        self.buddies = dict()
+    def get_second_variant2(self):
+        """"Расчет Варианта 3 по методу ilya-il'a """
+        buddies_debts = list()
+        # список личных средних значений для каждого участника
+        avg_list = dict()
+
+        # среднее значение с всеми вычтенными исключениями
+        # такое кол-во денег приходится на каждого участника
+        avg_all = ((self.get_total() - self.get_total_exclude()) / len(self.buddies), 2)
+
+        # цикл по всем исключениям
+        for ex in self.exclude:
+            # среднее значение по текущему исключению
+            avg_ex = round(self.exclude[ex], 2)/(len(self.buddies) - 1)
+            # цикл по участниках, чтобы учесть текущее исключение в их личных avg
+            # отсортировано по алфавиту
+            # for b in sorted(self.buddies.items(), key=operator.itemgetter(0)):
+
+        # отсортируем исключения по именам
+        return buddies_debts
 
 
 class TestMoneyBalancer(TestCase):
@@ -202,15 +316,7 @@ class TestMoneyBalancer(TestCase):
         self.assertDictEqual(ret, val)
 
     def test_get_buddies_debts2(self):
-        self.money.clear()
-        buddies = {'user1': 34.76, 'user4': 745.36, 'user2': 286.32, 'user0': 723.32, 'user5': 775.38,
-                   'user3': 643.0, 'user6': 399.61, 'user7': 284.18}
-        self.money.add_buddies(buddies)
-        res = self.money.get_buddies_debts()
-        print(res)
-
-    def test_get_buddies_debts3(self):
-        """Генерируем случайные списки пользователей и денег."""
+        """Генерируем случайные списки участников и денег."""
         self.money.clear()
         buddies = dict()
 
@@ -221,5 +327,63 @@ class TestMoneyBalancer(TestCase):
 
         print('Пати на {0} человек - '.format(len(buddies)) + buddies.__str__())
         self.money.add_buddies(buddies)
+
+        res = self.money.get_first_variant2()
+        print(res)
+
+    def test_zero_case2(self):
+        """Тест нулевого варианта."""
+        self.money.clear()
+        buddies = {
+            'user1': 100,
+            'user2': 150,
+            'user3': 50,
+            'user4': 0
+        }
+
+        print('Пати на {0} человек - '.format(len(buddies)) + buddies.__str__())
+        self.money.add_buddies(buddies)
+        res = self.money.get_zero_variant2()
+
+        print(res)
+
+    def test_first_case2(self):
+        """Тест первого варианта."""
+        self.money.clear()
+        buddies = {
+            'user1': 100,
+            'user2': 150,
+            'user3': 50,
+            'user4': 0
+        }
+
+        print('Пати на {0} человек - '.format(len(buddies)) + buddies.__str__())
+        self.money.add_buddies(buddies)
+        res = self.money.get_first_variant2()
+
+        print(res)
+
+    def test_second_variant2(self):
+        self.money.clear()
+        buddies = {
+            'user1': 100,
+            'user2': 150,
+            'user3': 50,
+            'user4': 0
+        }
+
+        exp = {
+            'user1': 50,
+        }
+
+        print('Пати на {0} человек - '.format(len(buddies)) + buddies.__str__())
+
+        self.money.add_buddies(buddies)
+        self.money.add_exceptions(exp)
+
+        res = self.money.get_second_variant2()
+
+        print(res)
+
         res = self.money.get_buddies_debts2()
         print(res)
