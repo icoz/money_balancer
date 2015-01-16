@@ -379,11 +379,11 @@ class TestMoneyBalancer(TestCase):
         print('Пати на {0} человек - '.format(len(buddies)) + buddies.__str__())
 
         self.money.add_buddies(buddies)
-        self.money.add_exceptions(exp)
+        self.money.add_exclusions(exp)
 
         res = self.money.get_second_variant2()
 
         print(res)
 
-        res = self.money.get_buddies_debts2()
+        res = self.money.get_second_variant2()
         print(res)
