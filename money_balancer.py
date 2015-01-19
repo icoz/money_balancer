@@ -99,8 +99,9 @@ class MoneyBalancer(object):
         return deepcopy(self.buddies)
 
     def clear(self):
-        """Очистка списка участников."""
+        """Очистка."""
         self.buddies = dict()
+        self.exclude = dict()
 
     #  Методики расчета #
 
@@ -247,6 +248,9 @@ class MoneyBalancer(object):
 
     def calculate_obshchak(self):
         """"Расчет по методу "общака" с исключениями или без."""
+
+        assert len(self.buddies) > 1, 'Кол-во участников должно быть не меньше двух'
+
         print('Участники - {0} человек - '.format(len(self.buddies)) + self.buddies.__str__())
         print('Исключения - {0} человек - '.format(len(self.exclude)) + self.exclude.__str__())
 
@@ -258,7 +262,7 @@ class MoneyBalancer(object):
         avg_list = {name: avg_val_all for name in self.buddies}
 
         print('Среднее значение на всех (учитывая исключения) - {0}'.format(avg_val_all))
-        print('Персональные средние - {0}'.format(avg_list.__str__()))
+        print('Общие средние - {0}'.format(avg_list.__str__()))
 
         # цикл по всем исключениям
         for name_ex in self.exclude:
@@ -280,6 +284,95 @@ class MoneyBalancer(object):
 
         del avg_list
         return buddies_debts
+
+    def calculate_personal(self):
+        """Расчет по методу "персональный"  с исключениями и без."""
+        # первоначальный расчет по методу общака
+        # имеем данные кто сколько должен отдать/получить
+        obshchak = self.calculate_obshchak()
+        print('Общак - {0}'.format(obshchak.__str__()))
+
+        # но деньги крутятся не в общаке, а передаются p2p
+
+        # положительные суммы
+        # этим участникам должны денег
+        # они получают
+        debit = [(name, obshchak[name]) for name in obshchak if obshchak[name] > 0]
+        # отрицательные суммы
+        # эти участники должны денег
+        # они отдают
+        credit = [(name, obshchak[name]) for name in obshchak if obshchak[name] <= 0]
+
+        # TODO: вопрос с сортировкой: цель - уменьшить кол-во передач денег из рук в руки
+        # им должны - сортировка по убыванию
+        debit.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        # они должны - сортировка по возрастанию (т.к. числа отрицательные)
+        credit.sort(key=lambda x: (x[0], x[1]))
+
+        print('Дебит - ' + debit.__str__())
+        print('Кредит - ' + credit.__str__())
+
+        # разделим кто-кому и кому-кто
+        debit_debts = dict()
+        credit_debts = dict()
+
+        # возвращаем долги
+        while len(debit) > 0:
+            du, dv = debit.pop(0)
+
+            if debit_debts.get(du) is None:
+                debit_debts[du] = dict()
+
+            print('\nСобираем {0} денег для {1}'.format(dv, du))
+            # собираем денег со всех должников
+            while True:
+                if len(credit) > 0:
+                    cu, cv = credit.pop(0)
+                    print('cu - {0}, cv - {0}'.format(cu, cv))
+
+                    if credit_debts.get(cu) is None:
+                        credit_debts[cu] = dict()
+
+                    # смотрим сколько может нам вернуть должник
+                    delta = round(dv + cv, 2)
+                    print('{0} должен всего {1} денег'.format(cu, cv))
+                    if delta > 0:  # чувак отдал все деньги, но дебет еще есть
+                        # cu отдает du cv денег и отдыхает
+                        print('{0} отдает {1} {2} денег'.format(cu, du, cv))
+                        # кому - кто
+                        debit_debts[du][cu] = -cv
+                        # кто - кому
+                        credit_debts[cu][du] = cv
+                        # оставшийся дебет
+                        dv = delta
+                        print('Остается в дебете {0}'.format(dv))
+                        pass
+                    elif delta < 0:  # чувак покрыл дебет, но еще остался должен
+                        # cu отдает du dv денег и попадает опять в список должников
+                        credit.append((cu, delta))
+                        print('{0} отдает {1} {2} денег и будет должен еще кому-нибудь {3}'.format(cu, du, dv, delta))
+                        # кому - кто
+                        debit_debts[du][cu] = dv
+                        # кто - кому
+                        credit_debts[cu][du] = -dv
+                        break
+                    else:  # дебет==кредит - они рассчитались друг с другом
+                        # cu отдает du cv денег и они оба отдыхают
+                        print('{0} отдает {1} {2} денег и все счастливы'.format(cu, du, cv))
+                        # кому - кто
+                        debit_debts[du][cu] = dv
+                        # кто - кому
+                        credit_debts[cu][du] = cv
+                        break
+                else:
+                    print('Из-за ошибок округления в дебите осталось немного денег - {0}'.format(dv))
+                    break
+
+        del credit
+        del debit
+
+        return {'d': debit_debts,
+                'c': credit_debts}
 
 
 class TestMoneyBalancer(TestCase):
@@ -352,4 +445,25 @@ class TestMoneyBalancer(TestCase):
         self.money.add_exclusions(ex)
 
         res = self.money.calculate_obshchak()
+        print(res)
+
+    def test_personal(self):
+        self.money.clear()
+        # участники
+        buddies = {
+            'user1': 100,
+            'user2': 100,
+            'user3': 150,
+            'user4': 50,
+            'user5': 200
+        }
+        # исключения (user1 не пьет =()
+        ex = {
+            'user1': 50
+        }
+
+        self.money.add_buddies(buddies)
+        self.money.add_exclusions(ex)
+
+        res = self.money.calculate_personal()
         print(res)
