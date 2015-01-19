@@ -328,7 +328,6 @@ class MoneyBalancer(object):
             while True:
                 if len(credit) > 0:
                     cu, cv = credit.pop(0)
-                    print('cu - {0}, cv - {0}'.format(cu, cv))
 
                     if credit_debts.get(cu) is None:
                         credit_debts[cu] = dict()
