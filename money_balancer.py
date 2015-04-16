@@ -54,13 +54,31 @@ class MoneyBalancer(object):
         # список участников и потраченых денег
         # {имя: сумма, }
         self.buddies = dict()
-        # список исключений (участники и деньги)
+        # список стафа
         # {имя: сумма, }
-        self.exclude = dict()
+        self.stuff = dict()
+        # список исключений (участники и стаф, цена стафа берется из списка стафа)
+        # {имя: имя_стафа, }
+        self.exclusion = dict()
+
+    # Поштучное добавление #
 
     def add_buddy(self, name, money):
         """Добавление участника и суммы, которую он реально потратил."""
+        # TODO: в списке должны быть уникальные имена, если повторно добавить участника, то надо сложить его деньги
         self.buddies[name] = money
+
+    def add_stuff(self, name, money):
+        """Добавление названия стафа и суммы, которую на него потратили."""
+        # TODO: в списке должны быть уникальные имена, если повторно добавить стаф, то надо сложить его стоимость
+        self.stuff[name] = money
+
+    def add_exclusion(self, name, stuff_name):
+        """Добавление названия стафа и суммы, которую на него потратили."""
+        # в списке могут быть неуникальные имена, т.к. у одного участника может быть несколько исключений
+        self.stuff[name] = stuff_name
+
+    # Массовое добавление #
 
     def add_buddies(self, buddies):
         """Добавление списка участников и реально потраченных ими сумм."""
@@ -69,30 +87,48 @@ class MoneyBalancer(object):
         for name in buddies:
             self.buddies[name] = buddies[name]
 
+    def add_stuffs(self, stuff):
+        """Добавление списка стафа и реально потраченных на них сумм."""
+        if not isinstance(stuff, dict):
+            raise ValueError('stuff must be dict')
+        for name in stuff:
+            self.stuff[name] = stuff[name]
+
     def add_exclusions(self, ex):
-        """Добавление списка исключений - участники и суммы."""
+        """Добавление списка исключений - участники и стаф."""
         if not isinstance(ex, dict):
             raise ValueError('exclusions must be dict')
         for name in ex:
-            self.exclude[name] = ex[name]
+            self.exclusion[name] = ex[name]
 
-    def get_avg(self):
-        """Расчет среднего значения по всем участникам."""
-        return round(self.get_total() / len(self.buddies), 2)
+    # Суммы #
 
-    def get_total(self):
+    def get_avg_buddies(self):
+        """Средняя сумма затрат по всем участникам."""
+        return round(self.get_total_buddies() / len(self.buddies), 2)
+
+    def get_total_buddies(self):
         """Полная сумма по всем участникам."""
-        s = 0.0
+        amount = 0.0
         for buddy in self.buddies:
-            s += self.buddies[buddy]
-        return round(s, 2)
+            amount += self.buddies[buddy]
+        return round(amount, 2)
 
-    def get_total_exclude(self):
+    def get_total_stuff(self):
+        """Полная сумма по всему стафу."""
+        amount = 0.0
+        for s in self.stuff:
+            amount += self.stuff[s]
+        return round(amount, 2)
+
+    def get_total_exclusions(self):
         """Полная сумма по всем исключениям."""
-        s = 0.0
-        for ex in self.exclude:
-            s += self.exclude[ex]
-        return round(s, 2)
+        amount = 0.0
+        for ex in self.exclusion:
+            amount += self.exclusion[ex]
+        return round(amount, 2)
+
+    # Прочее #
 
     def get_buddies(self):
         """Получение списка участников."""
@@ -101,13 +137,13 @@ class MoneyBalancer(object):
     def clear(self):
         """Очистка."""
         self.buddies = dict()
-        self.exclude = dict()
+        self.exclusion = dict()
 
     #  Методики расчета #
 
     def get_buddies_debts(self):
         """Расчет Варианта 1 по методу icoz'a """
-        avg = self.get_avg()
+        avg = self.get_avg_buddies()
         credit = list()
         debit = list()
         for b in self.buddies:
@@ -151,7 +187,7 @@ class MoneyBalancer(object):
         """"Расчет по методу "общак" без исключений. """
         # участники с положительной разницей берут из общака
         # участники с отрицательной разницей кладут в общак
-        avg = self.get_avg()
+        avg = self.get_avg_buddies()
 
         buddies_debts = list()
         # сортируем по именам
@@ -162,7 +198,7 @@ class MoneyBalancer(object):
 
     def get_first_variant(self):
         """Расчет по методу "персональный"  без исключений. """
-        avg = self.get_avg()
+        avg = self.get_avg_buddies()
 
         credit = list()
         debit = list()
@@ -248,15 +284,14 @@ class MoneyBalancer(object):
 
     def calculate_obshchak(self):
         """"Расчет по методу "общака" с исключениями или без."""
-
         assert len(self.buddies) > 1, 'Кол-во участников должно быть не меньше двух'
 
         print('Участники - {0} человек - '.format(len(self.buddies)) + self.buddies.__str__())
-        print('Исключения - {0} человек - '.format(len(self.exclude)) + self.exclude.__str__())
+        print('Исключения - {0} человек - '.format(len(self.exclusion)) + self.exclusion.__str__())
 
         # среднее значение со всеми вычтенными исключениями
         # такое кол-во денег приходится на каждого участника
-        avg_val_all = round((self.get_total() - self.get_total_exclude()) / len(self.buddies), 2)
+        avg_val_all = round((self.get_total_buddies() - self.get_total_exclusions()) / len(self.buddies), 2)
 
         # начальные персональные средние для всех участников
         avg_list = {name: avg_val_all for name in self.buddies}
@@ -265,10 +300,10 @@ class MoneyBalancer(object):
         print('Общие средние - {0}'.format(avg_list.__str__()))
 
         # цикл по всем исключениям
-        for name_ex in self.exclude:
+        for name_ex in self.exclusion:
             # среднее значение по текущему исключению
             # кол-во участников на 1 меньше, т.к. сумма исключения раскидывается на всех, кроме участника исключения
-            avg_val_ex = round(self.exclude[name_ex] / (len(self.buddies) - 1), 2)
+            avg_val_ex = round(self.exclusion[name_ex] / (len(self.buddies) - 1), 2)
             # добавить среднее от исключения всем, кроме участника исключения
             for name in avg_list:
                 if name != name_ex:
@@ -402,7 +437,7 @@ class TestMoneyBalancer(TestCase):
 
     def test_get_avg(self):
         self.test_add_buddy()
-        ret = self.money.get_avg()
+        ret = self.money.get_avg_buddies()
         self.assertEqual(31, ret)
 
     def test_get_buddies_debts(self):
