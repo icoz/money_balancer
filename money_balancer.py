@@ -3,8 +3,6 @@
 
 from copy import deepcopy
 from unittest import TestCase
-from random import randint, random
-import operator
 
 __author__ = 'icoz'
 
@@ -125,7 +123,7 @@ class MoneyBalancer(object):
         """Полная сумма по всем исключениям."""
         amount = 0.0
         for ex in self.exclusion:
-            amount += self.exclusion[ex]
+            amount += self.stuff[self.exclusion[ex]]
         return round(amount, 2)
 
     # Прочее #
@@ -138,155 +136,157 @@ class MoneyBalancer(object):
         """Очистка."""
         self.buddies = dict()
         self.exclusion = dict()
+        self.stuff = dict()
 
     #  Методики расчета #
 
-    def get_buddies_debts(self):
-        """Расчет Варианта 1 по методу icoz'a """
-        avg = self.get_avg_buddies()
-        credit = list()
-        debit = list()
-        for b in self.buddies:
-            diff = self.buddies[b] - avg
-            if diff > 0:  # если кто-то должен этому чуваку
-                debit.append((diff, b))
-            elif diff < 0:  # если это чувак кому-то должен
-                credit.append((diff, b))
-            else:  # этот чувак чист - никому не должен, но никто и ему не должен
-                pass
-        # теперь оптимально распределим кто кому сколько должен отдать
-        buddies_debts = dict()
-        while True:
-            credit.sort(key=lambda x: x[0])
-            debit.sort(key=lambda x: x[0], reverse=True)
-            lv, lu = credit.pop(0)
-            hv, hu = debit.pop(0)
-            val = hv + lv
-            if buddies_debts.get(hu) is None:
-                buddies_debts[hu] = dict()
-            if buddies_debts.get(lu) is None:
-                buddies_debts[lu] = dict()
-            if val > 0:  # если этому чуваку кто-то еще должен
-                debit.append((val, hu))
-                buddies_debts[hu][lu] = -lv  # positive
-                buddies_debts[lu][hu] = lv
-            elif val < 0:  # если этот чувак еще кому-то должен
-                credit.append((val, lu))
-                buddies_debts[hu][lu] = hv  # positive
-                buddies_debts[lu][hu] = -hv
-            else:  # кредит с дебетом сошлись
-                buddies_debts[hu][lu] = hv  # positive
-                buddies_debts[lu][hu] = lv
-            if len(credit) == 0 or len(debit) == 0:
-                break
-        del credit
-        del debit
-        return buddies_debts
+    # def get_buddies_debts(self):
+    #     """Расчет Варианта 1 по методу icoz'a """
+    #     avg = self.get_avg_buddies()
+    #     credit = list()
+    #     debit = list()
+    #     for b in self.buddies:
+    #         diff = self.buddies[b] - avg
+    #         if diff > 0:  # если кто-то должен этому чуваку
+    #             debit.append((diff, b))
+    #         elif diff < 0:  # если это чувак кому-то должен
+    #             credit.append((diff, b))
+    #         else:  # этот чувак чист - никому не должен, но никто и ему не должен
+    #             pass
+    #     # теперь оптимально распределим кто кому сколько должен отдать
+    #     buddies_debts = dict()
+    #     while True:
+    #         credit.sort(key=lambda x: x[0])
+    #         debit.sort(key=lambda x: x[0], reverse=True)
+    #         lv, lu = credit.pop(0)
+    #         hv, hu = debit.pop(0)
+    #         val = hv + lv
+    #         if buddies_debts.get(hu) is None:
+    #             buddies_debts[hu] = dict()
+    #         if buddies_debts.get(lu) is None:
+    #             buddies_debts[lu] = dict()
+    #         if val > 0:  # если этому чуваку кто-то еще должен
+    #             debit.append((val, hu))
+    #             buddies_debts[hu][lu] = -lv  # positive
+    #             buddies_debts[lu][hu] = lv
+    #         elif val < 0:  # если этот чувак еще кому-то должен
+    #             credit.append((val, lu))
+    #             buddies_debts[hu][lu] = hv  # positive
+    #             buddies_debts[lu][hu] = -hv
+    #         else:  # кредит с дебетом сошлись
+    #             buddies_debts[hu][lu] = hv  # positive
+    #             buddies_debts[lu][hu] = lv
+    #         if len(credit) == 0 or len(debit) == 0:
+    #             break
+    #     del credit
+    #     del debit
+    #     return buddies_debts
 
-    def get_zero_variant2(self):
-        """"Расчет по методу "общак" без исключений. """
-        # участники с положительной разницей берут из общака
-        # участники с отрицательной разницей кладут в общак
-        avg = self.get_avg_buddies()
+    # def get_zero_variant2(self):
+    #     """"Расчет по методу "общак" без исключений. """
+    #     # участники с положительной разницей берут из общака
+    #     # участники с отрицательной разницей кладут в общак
+    #     avg = self.get_avg_buddies()
+    #
+    #     buddies_debts = list()
+    #     # сортируем по именам
+    #     for b in sorted(self.buddies.items(), key=operator.itemgetter(0)):
+    #         buddies_debts.append((b[0], b[1] - avg))
+    #
+    #     return buddies_debts
 
-        buddies_debts = list()
-        # сортируем по именам
-        for b in sorted(self.buddies.items(), key=operator.itemgetter(0)):
-            buddies_debts.append((b[0], b[1] - avg))
-
-        return buddies_debts
-
-    def get_first_variant(self):
-        """Расчет по методу "персональный"  без исключений. """
-        avg = self.get_avg_buddies()
-
-        credit = list()
-        debit = list()
-
-        for b in self.buddies:
-            diff = round(self.buddies[b] - avg, 2)
-            if diff > 0:  # если кто-то должен этому чуваку
-                debit.append((diff, b))
-            elif diff < 0:  # если это чувак кому-то должен
-                credit.append((diff, b))
-            else:  # этот чувак чист - никому не должен, но никто и ему не должен
-                pass
-
-        # им должны - сортировка по убыванию
-        debit.sort(key=lambda x: (x[0], x[1]), reverse=True)
-        # они должны - сортировка по возрастанию (т.к. числа отрицательные)
-        credit.sort(key=lambda x: (x[0], x[1]))
-
-        print('Дебит - ' + debit.__str__())
-        print('Кредит - ' + credit.__str__())
-        print('Скидываемся по {0}'.format(avg))
-
-        # разделим кто-кому и кому-кто
-        debit_debts = dict()
-        credit_debts = dict()
-
-        # возвращаем долги
-        while len(debit) > 0:
-            dv, du = debit.pop(0)
-
-            if debit_debts.get(du) is None:
-                debit_debts[du] = dict()
-
-            print('\nСобираем {0} денег для {1}'.format(dv, du))
-            # собираем денег со всех должников
-            while True:
-                if len(credit) > 0:
-                    cv, cu = credit.pop(0)
-
-                    if credit_debts.get(cu) is None:
-                        credit_debts[cu] = dict()
-
-                    # смотрим сколько может нам вернуть должник
-                    delta = round(dv + cv, 2)
-                    print('{0} должен всего {1} денег'.format(cu, cv))
-                    if delta > 0:  # чувак отдал все деньги, но дебет еще есть
-                        # cu отдает du cv денег и отдыхает
-                        print('{0} отдает {1} {2} денег'.format(cu, du, cv))
-                        # кому - кто
-                        debit_debts[du][cu] = -cv
-                        # кто - кому
-                        credit_debts[cu][du] = cv
-                        # оставшийся дебет
-                        dv = delta
-                        print('Остается в дебете {0}'.format(dv))
-                        pass
-                    elif delta < 0:  # чувак покрыл дебет, но еще остался должен
-                        # cu отдает du dv денег и попадает опять в список должников
-                        credit.append((delta, cu))
-                        print('{0} отдает {1} {2} денег и будет должен еще кому-нибудь {3}'.format(cu, du, dv, delta))
-                        # кому - кто
-                        debit_debts[du][cu] = dv
-                        # кто - кому
-                        credit_debts[cu][du] = -dv
-                        break
-                    else:  # дебет==кредит - они рассчитались друг с другом
-                        # cu отдает du cv денег и они оба отдыхают
-                        print('{0} отдает {1} {2} денег и все счастливы'.format(cu, du, cv))
-                        # кому - кто
-                        debit_debts[du][cu] = dv
-                        # кто - кому
-                        credit_debts[cu][du] = cv
-                        break
-                else:
-                    print('Из-за ошибок округления в дебите осталось немного денег - {0}'.format(dv))
-                    break
-
-        del credit
-        del debit
-
-        return {'d': debit_debts,
-                'c': credit_debts}
+    # def get_first_variant(self):
+    #     """Расчет по методу "персональный"  без исключений. """
+    #     avg = self.get_avg_buddies()
+    #
+    #     credit = list()
+    #     debit = list()
+    #
+    #     for b in self.buddies:
+    #         diff = round(self.buddies[b] - avg, 2)
+    #         if diff > 0:  # если кто-то должен этому чуваку
+    #             debit.append((diff, b))
+    #         elif diff < 0:  # если это чувак кому-то должен
+    #             credit.append((diff, b))
+    #         else:  # этот чувак чист - никому не должен, но никто и ему не должен
+    #             pass
+    #
+    #     # им должны - сортировка по убыванию
+    #     debit.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    #     # они должны - сортировка по возрастанию (т.к. числа отрицательные)
+    #     credit.sort(key=lambda x: (x[0], x[1]))
+    #
+    #     print('Дебит - ' + debit.__str__())
+    #     print('Кредит - ' + credit.__str__())
+    #     print('Скидываемся по {0}'.format(avg))
+    #
+    #     # разделим кто-кому и кому-кто
+    #     debit_debts = dict()
+    #     credit_debts = dict()
+    #
+    #     # возвращаем долги
+    #     while len(debit) > 0:
+    #         dv, du = debit.pop(0)
+    #
+    #         if debit_debts.get(du) is None:
+    #             debit_debts[du] = dict()
+    #
+    #         print('\nСобираем {0} денег для {1}'.format(dv, du))
+    #         # собираем денег со всех должников
+    #         while True:
+    #             if len(credit) > 0:
+    #                 cv, cu = credit.pop(0)
+    #
+    #                 if credit_debts.get(cu) is None:
+    #                     credit_debts[cu] = dict()
+    #
+    #                 # смотрим сколько может нам вернуть должник
+    #                 delta = round(dv + cv, 2)
+    #                 print('{0} должен всего {1} денег'.format(cu, cv))
+    #                 if delta > 0:  # чувак отдал все деньги, но дебет еще есть
+    #                     # cu отдает du cv денег и отдыхает
+    #                     print('{0} отдает {1} {2} денег'.format(cu, du, cv))
+    #                     # кому - кто
+    #                     debit_debts[du][cu] = -cv
+    #                     # кто - кому
+    #                     credit_debts[cu][du] = cv
+    #                     # оставшийся дебет
+    #                     dv = delta
+    #                     print('Остается в дебете {0}'.format(dv))
+    #                     pass
+    #                 elif delta < 0:  # чувак покрыл дебет, но еще остался должен
+    #                     # cu отдает du dv денег и попадает опять в список должников
+    #                     credit.append((delta, cu))
+    #                     print('{0} отдает {1} {2} денег и будет должен еще кому-нибудь {3}'.format(cu, du, dv, delta))
+    #                     # кому - кто
+    #                     debit_debts[du][cu] = dv
+    #                     # кто - кому
+    #                     credit_debts[cu][du] = -dv
+    #                     break
+    #                 else:  # дебет==кредит - они рассчитались друг с другом
+    #                     # cu отдает du cv денег и они оба отдыхают
+    #                     print('{0} отдает {1} {2} денег и все счастливы'.format(cu, du, cv))
+    #                     # кому - кто
+    #                     debit_debts[du][cu] = dv
+    #                     # кто - кому
+    #                     credit_debts[cu][du] = cv
+    #                     break
+    #             else:
+    #                 print('Из-за ошибок округления в дебите осталось немного денег - {0}'.format(dv))
+    #                 break
+    #
+    #     del credit
+    #     del debit
+    #
+    #     return {'d': debit_debts,
+    #             'c': credit_debts}
 
     def calculate_obshchak(self):
         """"Расчет по методу "общака" с исключениями или без."""
         assert len(self.buddies) > 1, 'Кол-во участников должно быть не меньше двух'
 
         print('Участники - {0} человек - '.format(len(self.buddies)) + self.buddies.__str__())
+        print('Стаф - {0} человек - '.format(len(self.stuff)) + self.stuff.__str__())
         print('Исключения - {0} человек - '.format(len(self.exclusion)) + self.exclusion.__str__())
 
         # среднее значение со всеми вычтенными исключениями
@@ -303,7 +303,7 @@ class MoneyBalancer(object):
         for name_ex in self.exclusion:
             # среднее значение по текущему исключению
             # кол-во участников на 1 меньше, т.к. сумма исключения раскидывается на всех, кроме участника исключения
-            avg_val_ex = round(self.exclusion[name_ex] / (len(self.buddies) - 1), 2)
+            avg_val_ex = round(self.stuff[self.exclusion[name_ex]] / (len(self.buddies) - 1), 2)
             # добавить среднее от исключения всем, кроме участника исключения
             for name in avg_list:
                 if name != name_ex:
@@ -440,43 +440,50 @@ class TestMoneyBalancer(TestCase):
         ret = self.money.get_avg_buddies()
         self.assertEqual(31, ret)
 
-    def test_get_buddies_debts(self):
-        self.money.clear()
-        buddies = {
-            'user1': 0,
-            'user2': 100,
-            'user3': 43,
-            'user4': 0,
-            'user5': 12
-        }
-        self.money.add_buddies(buddies)
-        ret = self.money.get_buddies_debts()
-        val = {
-            'user1': {'user2': -31.0},
-            'user2': {'user1': 31.0, 'user4': 31.0, 'user5': 7.0},
-            'user3': {'user5': 12.0},
-            'user4': {'user2': -31.0},
-            'user5': {'user2': -7.0, 'user3': -12.0}
-        }
-        self.assertDictEqual(ret, val)
+    # def test_get_buddies_debts(self):
+    #     self.money.clear()
+    #     buddies = {
+    #         'user1': 0,
+    #         'user2': 100,
+    #         'user3': 43,
+    #         'user4': 0,
+    #         'user5': 12
+    #     }
+    #     self.money.add_buddies(buddies)
+    #     ret = self.money.get_buddies_debts()
+    #     val = {
+    #         'user1': {'user2': -31.0},
+    #         'user2': {'user1': 31.0, 'user4': 31.0, 'user5': 7.0},
+    #         'user3': {'user5': 12.0},
+    #         'user4': {'user2': -31.0},
+    #         'user5': {'user2': -7.0, 'user3': -12.0}
+    #     }
+    #     self.assertDictEqual(ret, val)
 
     def test_obshchak(self):
         self.money.clear()
         # участники
         buddies = {
-            'user1': 100,
-            'user2': 100,
-            'user3': 150,
-            'user4': 50,
-            'user5': 200
+            'Вася': 100,
+            'Петя': 100,
+            'Маша': 150,
+            'Вова': 0,
+            'Дима': 200
         }
-        # исключения (user1 не пьет =()
+        # стаф
+        stuffs = {
+            'Бухло': 100,
+            'Еда': 400,
+            'Семки': 50
+        }
+        # исключения (Маша не пьет =()
         ex = {
-            'user1': 50
+            'Маша': 'Бухло'
         }
 
         self.money.add_buddies(buddies)
         self.money.add_exclusions(ex)
+        self.money.add_stuffs(stuffs)
 
         res = self.money.calculate_obshchak()
         print(res)
@@ -485,19 +492,26 @@ class TestMoneyBalancer(TestCase):
         self.money.clear()
         # участники
         buddies = {
-            'user1': 100,
-            'user2': 100,
-            'user3': 150,
-            'user4': 50,
-            'user5': 200
+            'Вася': 100,
+            'Петя': 100,
+            'Маша': 150,
+            'Вова': 0,
+            'Дима': 200
+        }
+        # стаф
+        stuffs = {
+            'Бухло': 100,
+            'Еда': 400,
+            'Семки': 50
         }
         # исключения (user1 не пьет =()
         ex = {
-            'user1': 50
+            'Маша': 'Бухло'
         }
 
         self.money.add_buddies(buddies)
         self.money.add_exclusions(ex)
+        self.money.add_stuffs(stuffs)
 
         res = self.money.calculate_personal()
         print(res)
